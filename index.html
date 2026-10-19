@@ -167,6 +167,13 @@ button.card:hover{transform:translateY(-3px)}
 .modal{position:fixed;inset:0;background:#000b;display:grid;place-items:center;padding:16px;z-index:50}
 .modal .box{background:var(--board);border:1px solid var(--gold-d);border-radius:12px;padding:18px;max-width:560px;width:100%;max-height:90vh;overflow:auto;display:grid;gap:12px}
 .modal h2{font-family:var(--f-disp);font-weight:400;margin:0;font-size:20px}
+/* 手番交代の確認は画面いっぱいに */
+.modal.full{padding:0;background:var(--ground)}
+.modal.full .box{width:100%;height:100%;max-width:none;max-height:none;border:0;border-radius:0;
+  padding:24px;place-content:center;justify-items:center;align-content:center;gap:24px;text-align:center}
+.modal.full h2{font-size:clamp(30px,8vw,60px);line-height:1.15}
+.modal.full .lede{font-size:clamp(15px,3.4vw,22px);max-width:34ch;text-align:center}
+.modal.full .btn{font-size:clamp(16px,4vw,22px);padding:16px 36px;border-radius:8px}
 .big{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
 .big .card{max-width:190px;width:190px;font-size:14px}
 .big .card .nm{font-size:20px}.big .card .dept{font-size:10px}.big .card .attr{font-size:11px}.big .card .lg{font-size:10px}.big .card .bt{width:34px;height:34px}.big .card .topt{font-size:8px}.big .card .ptv{font-size:14px}.big .card .no{font-size:9px}
@@ -879,7 +886,7 @@ function render(){
   </div>
   <aside style="display:grid;gap:14px;align-content:start"><section class="panel"><h3>プレイヤー</h3><div class="opp">${oppHTML()}</div></section>
   <section class="panel"><h3>ログ</h3><div class="log">${G.log.map(l=>`<div>${l}</div>`).join("")}</div></section></aside></div>
-  ${UI.pass?`<div class="modal"><div class="box" style="text-align:center"><h2>${esc(P.name)} の番です</h2><p class="lede" style="margin:auto">ほかの人に手札が見えないように端末を渡してください。</p><button class="btn primary" data-act="unpass">手札を見る</button></div></div>`:""}
+  ${UI.pass?`<div class="modal full"><div class="box"><h2>${esc(P.name)} の番です</h2><p class="lede">ほかの人に手札が見えないように端末を渡してください。</p><button class="btn primary" data-act="unpass">手札を見る</button></div></div>`:""}
   ${UI.detail?detailHTML(UI.detail):""}
   ${UI.showRules?rulesHTML():""}
   ${G.over?overHTML():""}`;
