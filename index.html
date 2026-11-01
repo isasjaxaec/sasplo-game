@@ -233,7 +233,9 @@ table.score tr.win td{color:var(--gold);font-weight:700}
   function studentCount(P) { return P.cols.ES.length + P.cols.SS.length; }
   function canExpand(P) { return !P.expandUsed && studentCount(P) >= 3 && P.hand.length > 0; }
   function nextPlayer(S) { return S.players[(S.cur + 1) % S.players.length]; }
-  function canHeadhunt(S, P) { const Q = nextPlayer(S); return !P.hhUsed && P.cols.T.length >= 2 && Q !== P && Q.hand.length > 0; }
+  function canHeadhunt(S, P) { const Q = nextPlayer(S); return !P.hhUsed && P.hhReady && Q !== P && Q.hand.length > 0; }
+  /** 雇用フェイズ終了時に呼ぶ：一般職員が2人以上ならヘッドハンティング解禁 */
+  function markHireEnd(P) { if (P.cols.T.length >= 2) P.hhReady = true; }
   function doHeadhunt(S, P) { const Q = nextPlayer(S); const i = Math.floor(S.rnd() * Q.hand.length); const c = Q.hand.splice(i, 1)[0]; P.hand.push(c); P.hhUsed = true; return c; }
   function allHired(P) { const r = []; for (const k of COL_KEYS) for (const c of P.cols[k]) r.push(c); return r; }
   function score(P) {
@@ -249,7 +251,7 @@ table.score tr.win td{color:var(--gold);font-weight:700}
   /* ---------- game flow (seedable) ---------- */
   function mulberry32(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
   function shuffle(a, rnd) { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rnd() * (i + 1)); const t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
-  function newPlayer(name) { return { name, hand: [], cols: { E: [], S: [], T: [], ES: [], SS: [] }, slots: [null, null, null, null, null], expandUsed: false, hhUsed: false, turns: 0 }; }
+  function newPlayer(name) { return { name, hand: [], cols: { E: [], S: [], T: [], ES: [], SS: [] }, slots: [null, null, null, null, null], expandUsed: false, hhUsed: false, hhReady: false, turns: 0 }; }
   function newGame(CARDS, CRAFTS, nPlayers, nCrafts, rnd) {
     const deck = shuffle(CARDS.map(c => ({ ...c })), rnd);
     const pool = shuffle(CRAFTS.map(c => ({ ...c })), rnd).slice(0, nCrafts);
@@ -287,12 +289,13 @@ table.score tr.win td{color:var(--gold);font-weight:700}
     for (const a of plan) {
       if (a.t === "hire") { const c = P.hand.find(x => x.id === a.id); doHire(S, P, c, a.pay); }
       else if (a.t === "expand") { const c = P.hand.find(x => x.id === a.id); doExpand(S, P, c); }
-      else if (a.t === "launch") doLaunch(S, P, a.k, a.slot);
+      else if (a.t === "launch") { markHireEnd(P); doLaunch(S, P, a.k, a.slot); }
     }
+    markHireEnd(P);
   }
 
   const E = { COLS, COL_KEYS, COLMAP, SLOTS, ALL_LOGOS, NO_DIRECTOR, NO_SAWAI, NO_TSUDA,
-    colOf, logosOf, bloodMatch, costInfo, power, slotOk, studentCount, canExpand, canHeadhunt, doHeadhunt, allHired, score,
+    colOf, logosOf, bloodMatch, costInfo, power, slotOk, studentCount, canExpand, canHeadhunt, markHireEnd, doHeadhunt, allHired, score,
     mulberry32, shuffle, newGame, draw, startTurn, doHire, doExpand, doLaunch, endTurn, applyPlan };
   if (typeof module !== "undefined" && module.exports) module.exports = E; else root.SusproEngine = E;
 })(typeof self !== "undefined" ? self : this);
@@ -625,7 +628,12 @@ function slotOk(P,i){ const s=SLOTS[i],pw=power(P); return !P.slots[i] && pw.E>=
 function studentCount(P){return P.cols.ES.length+P.cols.SS.length;}
 function canExpand(P){return !P.expandUsed && studentCount(P)>=3 && P.hand.length>0;}
 function nextP(){return G.players[(G.cur+1)%G.players.length];}
-function canHeadhunt(P){const Q=nextP(); return !P.hhUsed && P.cols.T.length>=2 && Q!==P && Q.hand.length>0;}
+function canHeadhunt(P){const Q=nextP(); return !P.hhUsed && P.hhReady && Q!==P && Q.hand.length>0;}
+function endHire(P){
+  if(G.phase!=="hire") return;
+  G.phase="launch";
+  if(!P.hhReady && P.cols.T.length>=2){ P.hhReady=true; log(`${esc(P.name)} は一般職員が2人そろい、ヘッドハンティングが可能になった`); }
+}
 function headhunt(P){
   const Q=nextP(), c=Q.hand.splice(Math.floor(Math.random()*Q.hand.length),1)[0];
   P.hand.push(c); P.hhUsed=true;
@@ -651,7 +659,7 @@ try{const s=JSON.parse(localStorage.getItem("suspro-setup")||"null"); if(s&&s.pl
 function newGame(){
   const deck=shuffle(CARDS.map(c=>({...c})));
   const pool=shuffle(CRAFTS.map(c=>({...c}))).slice(0,SETUP.crafts);
-  const players=SETUP.players.slice(0,SETUP.n).map((p,i)=>({name:p.name||("P"+(i+1)),cpu:p.cpu,strong:!!(p.cpu&&p.strong),hand:[],cols:{E:[],S:[],T:[],ES:[],SS:[]},slots:[null,null,null,null,null],expandUsed:false,hhUsed:false,turns:0}));
+  const players=SETUP.players.slice(0,SETUP.n).map((p,i)=>({name:p.name||("P"+(i+1)),cpu:p.cpu,strong:!!(p.cpu&&p.strong),hand:[],cols:{E:[],S:[],T:[],ES:[],SS:[]},slots:[null,null,null,null,null],expandUsed:false,hhUsed:false,hhReady:false,turns:0}));
   G={deck,discard:[],pool,players,cur:0,round:1,phase:"hire",hires:0,launched:false,log:[],over:false,lastRound:false};
   players.forEach((P,idx)=>{ for(let i=0;i<7+idx;i++) draw(P); });
   try{localStorage.setItem("suspro-setup",JSON.stringify(SETUP));}catch(e){}
@@ -726,6 +734,8 @@ function cpuTurn(){
     const pay=P.hand.filter(c=>c!==best).sort((a,b)=>cardValue(P,a)-cardValue(P,b)).slice(0,ci.cost).map(c=>c.id);
     hire(P,best,pay);
   }
+  endHire(P);
+  if(canHeadhunt(P)) headhunt(P);
   const opt=bestLaunch(P); if(opt) launch(P,opt.craft,opt.slot);
   render(); setTimeout(endTurn, 900);
 }
@@ -751,11 +761,11 @@ function strongCpuTurn(){
   const steps=plan.slice();
   const step=()=>{
     if(G!==g0) return; // 途中でやめた場合
-    if(!steps.length){ render(); setTimeout(()=>{ if(G===g0) endTurn(); },900); return; }
+    if(!steps.length){ endHire(P); if(canHeadhunt(P)) headhunt(P); render(); setTimeout(()=>{ if(G===g0) endTurn(); },900); return; }
     const a=steps.shift();
     if(a.t==="hire"){ const c=P.hand.find(x=>x.id===a.id); if(c) hire(P,c,a.pay); }
     else if(a.t==="expand"){ const c=P.hand.find(x=>x.id===a.id); if(c) expand(P,c); }
-    else if(a.t==="launch"){ G.phase="launch"; const cr=G.pool.find(x=>x.k===a.k); if(cr&&slotOk(P,a.slot)) launch(P,cr,a.slot); }
+    else if(a.t==="launch"){ endHire(P); if(canHeadhunt(P)) headhunt(P); const cr=G.pool.find(x=>x.k===a.k); if(cr&&slotOk(P,a.slot)) launch(P,cr,a.slot); }
     render(); setTimeout(step,600);
   };
   step();
@@ -868,7 +878,8 @@ function render(){
       (canHeadhunt(P)?`<button class="btn" data-act="headhunt">ヘッドハンティング（1回限り）</button>`:"");
     }
   } else if(human && G.phase==="launch"){
-    actions=`<button class="btn primary" data-act="end">ターン終了</button>`+(UI.craft?`<button class="btn ghost" data-act="cancel">選び直す</button>`:"");
+    actions=`<button class="btn primary" data-act="end">ターン終了</button>`+(UI.craft?`<button class="btn ghost" data-act="cancel">選び直す</button>`:"")+
+      (canHeadhunt(P)&&!UI.craft?`<button class="btn" data-act="headhunt">ヘッドハンティング（1回限り）</button>`:"");
   }
   const poolPick = human && G.phase==="launch" && !G.launched;
   const pool=G.pool.map((c,i)=>`<div style="width:110px;flex:none">${cardHTML(c,{button:true,act:poolPick?"craft":"detail",id:i,cls:UI.craft===c?"sel":""})}</div>`).join("")||'<span class="note">すべて打ち上げ済み — このラウンドで終了</span>';
@@ -922,7 +933,7 @@ function rulesHTML(){
       <li><b>研究室の拡大</b>：雇用している学生が合計3枚以上ならゲーム中に1回だけ、手札1枚を伏せて一般職員としてコスト無しで雇用できる（2人の雇用枠を1つ使う）。</li>
     </ul>
   </div>
-  <div><b>ヘッドハンティング</b>：一般職員を2人以上雇用していればゲーム中に1回だけ、自分のターンの雇用フェイズ中に、次の手番の人の手札からランダムに1枚を獲得して自分の手札に加えられる（雇用枠は使わない）。</div>
+  <div><b>ヘッドハンティング</b>：一般職員を2人以上雇用していればゲーム中に1回だけ、次の手番の人の手札からランダムに1枚を獲得して自分の手札に加えられる（雇用枠は使わない）。使えるようになるのは、2人目の一般職員を雇用したターンの雇用フェイズが終わった後から（そのターンの打ち上げフェイズ以降）。以後は自分のターンの雇用フェイズ・打ち上げフェイズ中いつでも使える。</div>
   <div><b>宇宙機の打ち上げ</b>：プレイシートに記載された必要な属性を持つ探究者カードを、指定された枚数だけ雇用している（⚒工学・🔭&#xFE0E;理学・◎職員）と、未打ち上げの宇宙機から自由に選んで置ける。研究者は2枚分、澤井副所長は3枚分として扱う。</div>
   <div><b>得点</b>：探究者の点＋宇宙機枠の点＋プロジェクトボーナス（打ち上げた宇宙機と同じロゴの探究者1枚につき+1、藤本所長は全ロゴ）＋全5属性そろえると+3。この合計得点が高い人が勝ち。</div>
   <div><b>終了</b>：場の宇宙機がすべて打ち上がったら、そのラウンドの最後のプレイヤーまで遊んで終了。</div>
@@ -982,9 +993,9 @@ document.addEventListener("click",e=>{
     case "confirm": hire(P,UI.sel,UI.pay); UI.sel=null; UI.pay=[]; render(); break;
     case "cancel": UI.sel=null; UI.pay=[]; UI.expand=false; UI.craft=null; render(); break;
     case "expand": UI.expand=true; render(); break;
-    case "headhunt": if(G.phase==="hire"&&!UI.sel&&!UI.expand&&canHeadhunt(P)){ const Q=nextP(); if(confirm(`${Q.name} の手札からランダムに1枚獲得します（ゲーム中1回限り）。よろしいですか？`)){ const c=headhunt(P); render(); UI.detail=c; render(); } } break;
+    case "headhunt": if(((G.phase==="hire"&&!UI.sel&&!UI.expand)||(G.phase==="launch"&&!UI.craft))&&canHeadhunt(P)){ const Q=nextP(); if(confirm(`${Q.name} の手札からランダムに1枚獲得します（ゲーム中1回限り）。よろしいですか？`)){ const c=headhunt(P); render(); UI.detail=c; render(); } } break;
     case "expandpick": { const c=findHand(); if(c){expand(P,c);UI.expand=false;render();} break; }
-    case "tolaunch": G.phase="launch"; UI.sel=null; UI.pay=[]; render(); break;
+    case "tolaunch": endHire(P); UI.sel=null; UI.pay=[]; render(); break;
     case "craft": UI.craft=G.pool[+id]; render(); break;
     case "slot": if(UI.craft && slotOk(P,+id)){ launch(P,UI.craft,+id); UI.craft=null; render(); } break;
     case "end": endTurn(); break;
