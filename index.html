@@ -185,6 +185,7 @@ table.score th:first-child,table.score td:first-child{text-align:left;font-famil
 table.score tr.win td{color:var(--gold);font-weight:700}
 .rules{font-size:13px;color:var(--mute);display:grid;gap:6px}
 .rules b{color:var(--ink)}
+.rules.rulespage,.rules.rulespage b,.rules.rulespage li{color:#fff}
 .breakdown{font-family:var(--f-num);font-size:13px;display:grid;gap:2px}
 </style>
 
@@ -920,7 +921,7 @@ function overHTML(){
   <div class="actions"><button class="btn primary" data-act="again">もう一度</button><button class="btn" data-act="quit">設定に戻る</button><button class="btn ghost" data-act="closeover">盤面を見る</button></div></div></div>`;
 }
 function rulesHTML(){
-  return `<div class="modal" data-act="closerules"><div class="box"><h2>ルールのまとめ</h2><div class="rules">
+  return `<div class="modal" data-act="closerules"><div class="box"><h2>ルールのまとめ</h2><div class="rules rulespage">
   <div><b>ゲームの目的</b>：あなたは宇宙センターのセンター長です。各分野の人材を雇用し、宇宙プロジェクトを成功に導いて、最も多くの功績を上げることを目指します。</div>
   <div><b>ゲームの流れ</b>：ゲームはターン制で進行します。</div>
   <div><b>初期手札</b>：最初の手番の人は7枚、以降の人は手番順に1枚ずつ増える（例：3人プレイなら1番目7枚・2番目8枚・3番目9枚）。</div>
