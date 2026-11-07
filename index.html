@@ -166,6 +166,10 @@ button.card:hover{transform:translateY(-3px)}
 /* modal */
 .modal{position:fixed;inset:0;background:#000b;display:grid;place-items:center;padding:16px;z-index:50}
 .modal .box{background:var(--board);border:1px solid var(--gold-d);border-radius:12px;padding:18px;max-width:560px;width:100%;max-height:90vh;overflow:auto;display:grid;gap:12px}
+.modal.vid .box{max-width:min(440px,100%);max-height:96vh;justify-items:center}
+.modal.vid video{display:block;width:auto;max-width:100%;max-height:calc(96vh - 110px);aspect-ratio:9/16;background:#000;border-radius:8px}
+.modal.ask .box{max-width:360px;text-align:center}
+.modal.ask .row{justify-content:center;gap:12px}
 .modal h2{font-family:var(--f-disp);font-weight:400;margin:0;font-size:20px}
 /* 手番交代の確認は画面いっぱいに */
 .modal.full{padding:0;background:var(--ground)}
@@ -653,7 +657,8 @@ function score(P){
 }
 
 /* ---------- state ---------- */
-let G=null, UI={sel:null,pay:[],expand:false,craft:null,detail:null,pass:false,showRules:false};
+let G=null, UI={sel:null,pay:[],expand:false,craft:null,detail:null,pass:false,showRules:false,vidAsk:false,video:false};
+const HOWTO_VIDEO="sasplo-explorers-how-to-gameplay.mp4";
 let SETUP={n:2,players:[{name:"プレイヤー1",cpu:false},{name:"CPU 1",cpu:true},{name:"CPU 2",cpu:true},{name:"CPU 3",cpu:true}],crafts:5};
 try{const s=JSON.parse(localStorage.getItem("suspro-setup")||"null"); if(s&&s.players) SETUP=s;}catch(e){}
 
@@ -920,6 +925,15 @@ function overHTML(){
   ${rows.map(r=>`<tr class="${r.s.total===top?"win":""}"><td>${esc(r.P.name)}</td><td>${r.s.exp}</td><td>${r.s.crafts}</td><td>${r.s.proj}</td><td>${r.s.comp}</td><td>${r.s.total}</td></tr>`).join("")}</table></div>
   <div class="actions"><button class="btn primary" data-act="again">もう一度</button><button class="btn" data-act="quit">設定に戻る</button><button class="btn ghost" data-act="closeover">盤面を見る</button></div></div></div>`;
 }
+function vidAskHTML(){
+  return `<div class="modal ask" data-act="vidno"><div class="box"><h2>説明動画を見ますか？</h2>
+  <div class="row"><button class="btn primary" data-act="vidyes">はい</button><button class="btn ghost" data-act="vidno">いいえ</button></div></div></div>`;
+}
+function videoHTML(){
+  return `<div class="modal vid" data-act="vidclose"><div class="box"><h2>遊び方の説明動画</h2>
+  <video src="${HOWTO_VIDEO}" controls autoplay playsinline preload="auto"></video>
+  <button class="btn" data-act="vidclose" style="width:100%">閉じてルールを見る</button></div></div>`;
+}
 function rulesHTML(){
   return `<div class="modal" data-act="closerules"><div class="box"><h2>ルールのまとめ</h2><div class="rules rulespage">
   <div><b>ゲームの目的</b>：あなたは宇宙センターのセンター長です。各分野の人材を雇用し、宇宙プロジェクトを成功に導いて、最も多くの功績を上げることを目指します。</div>
@@ -950,7 +964,7 @@ function setupHTML(){
   <div style="display:grid;gap:8px">${pls}</div>
   <div class="row"><button class="btn primary" data-act="start">ゲーム開始</button><button class="btn ghost" data-act="rules0">ルールを見る</button></div>
   <div><h3 style="font-size:12px;color:var(--mute);letter-spacing:.14em;margin:0 0 8px">収録カードの一部</h3><div class="hand">${[6,52,71,0,12,92].map(i=>i<CARDS.length?cardHTML(CARDS[i]):"").join("")}${cardHTML(CRAFTS[2])}${cardHTML({back:1})}</div></div>
-  </section>${UI.showRules?rulesHTML():""}`;
+  </section>${UI.showRules?rulesHTML():""}${UI.vidAsk?vidAskHTML():""}${UI.video?videoHTML():""}`;
 }
 
 /* ---------- events ---------- */
@@ -961,7 +975,7 @@ document.addEventListener("change",e=>{
   else if(t.dataset.pc){const q=SETUP.players[+t.dataset.pc]; q.cpu=t.value!=="h"; q.strong=t.value==="s";}
 });
 document.addEventListener("input",e=>{const t=e.target; if(t.dataset.pn){SETUP.players[+t.dataset.pn].name=t.value;}});
-document.addEventListener("keydown",e=>{ if((e.key==="Enter"||e.key===" ")&&e.target.dataset&&e.target.dataset.act==="slot"){e.preventDefault();e.target.click();} if(e.key==="Escape"&&(UI.detail||UI.showRules)){UI.detail=null;UI.showRules=false;render();}});
+document.addEventListener("keydown",e=>{ if(e.key==="Escape"&&(UI.vidAsk||UI.video)){ UI.vidAsk=false; UI.video=false; UI.showRules=true; render(); return; } if((e.key==="Enter"||e.key===" ")&&e.target.dataset&&e.target.dataset.act==="slot"){e.preventDefault();e.target.click();} if(e.key==="Escape"&&(UI.detail||UI.showRules)){UI.detail=null;UI.showRules=false;render();}});
 document.addEventListener("click",e=>{
   const el=e.target.closest("[data-act]"); if(!el) return;
   const act=el.dataset.act, id=el.dataset.id;
@@ -972,7 +986,11 @@ document.addEventListener("click",e=>{
     case "start": newGame(); break;
     case "again": newGame(); break;
     case "quit": if(!G||G.over||confirm("ゲームをやめて設定に戻りますか？")){G=null;render();} break;
-    case "rules": case "rules0": UI.showRules=true; render(); break;
+    case "rules": UI.showRules=true; render(); break;
+    case "rules0": UI.vidAsk=true; render(); break;
+    case "vidyes": UI.vidAsk=false; UI.video=true; render(); break;
+    case "vidno": UI.vidAsk=false; UI.showRules=true; render(); break;
+    case "vidclose": UI.video=false; UI.showRules=true; render(); break;
     case "closerules": UI.showRules=false; render(); break;
     case "closeover": G.over=false; G.phase="done"; render(); break;
     case "unpass": UI.pass=false; render(); break;
